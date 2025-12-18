@@ -182,6 +182,16 @@ def sync_to_notion(issues):
             "multi_select": [{"name": e["node"]["name"]} for e in labels_edges]
         } if labels_edges else {"multi_select": []}
 
+        # Debug: show all relevant Linear values before sending to Notion
+        print(f"[DEBUG] Processing issue '{issue['title']}' (ID: {issue['id']})")
+        print(f"        Priority (raw): {issue.get('priority')}")
+        print(f"        Cycle: {issue.get('cycle')}")
+        labels_edges = issue.get("labels", {}).get("edges", [])
+        print(f"        Labels: {[e['node']['name'] for e in labels_edges if e.get('node')]}")
+        print(f"        Project: {issue.get('project')}")
+        print(f"        Status: {issue.get('state')}")
+        print(f"        Assignee: {issue.get('assignee')}")
+
         # Check if page already exists in Notion
         page = find_notion_page_by_linear_id(issue["id"])  # you will implement this
         try:
