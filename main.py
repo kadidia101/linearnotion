@@ -166,15 +166,22 @@ def save_last_sync_time(timestamp, file_path="last_sync.txt"):
 
 def sync_to_notion(issues):
     last_sync = get_last_sync_time()
+    # Determine issues to sync with debugging
     issues_to_sync = []
-
     for issue in issues:
         issue_time_str = issue.get("updatedAt") or issue.get("createdAt")
         issue_time = datetime.fromisoformat(issue_time_str.replace("Z", "+00:00"))
-
+    
+        # DEBUG: print issue info and timestamp comparison
+        print(f"[DEBUG] Issue '{issue['title']}' (ID: {issue['id']}) updated at {issue_time} | last_sync={last_sync}")
+    
         # Include all issues if first run, otherwise only if updated since last sync
         if last_sync.year <= 2000 or issue_time > last_sync:
             issues_to_sync.append(issue)
+            print(f"[DEBUG] -> Will be synced")
+        else:
+            print(f"[DEBUG] -> Skipped (not updated since last sync)")
+    
 
     print(f"[INFO] {len(issues)} issues fetched from Linear")
     print(f"[INFO] {len(issues_to_sync)} issues to process")
