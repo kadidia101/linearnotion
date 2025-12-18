@@ -16,6 +16,8 @@ notion = Client(auth=NOTION_TOKEN)
 # ----------------------
 # STEP 1: Define GraphQL query to get issues for a team
 # ----------------------
+import requests
+
 def get_linear_issues(team_id):
     url = "https://api.linear.app/graphql"
     headers = {
@@ -23,18 +25,22 @@ def get_linear_issues(team_id):
         "Content-Type": "application/json"
     }
     
+    # Updated query: fetch all issues with their state name
     query = """
     query Team($teamId: String!) {
       team(id: $teamId) {
         id
         name
-        issues(filter: {state: {name: {in: ["In Progress", "In Training"]}}}) {
+        issues {
           nodes {
             id
             title
             description
             assignee {
               id
+              name
+            }
+            state {
               name
             }
             createdAt
@@ -45,13 +51,23 @@ def get_linear_issues(team_id):
     }
     """
     
-    variables = {"teamId": "b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6"} 
+    variables = {"teamId": team_id}  # <-- Make sure this is the UUID from Linear
     
     response = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
-    response.raise_for_status()
+    
+    # Debug: print Linear response if it fails
+    if response.status_code != 200:
+        print("Linear API response:", response.text)
+        response.raise_for_status()
+    
     data = response.json()
     
-    issues = data["data"]["team"]["issues"]["nodes"]
+    # Filter issues in Python
+    issues = [
+        issue for issue in data["data"]["team"]["issues"]["nodes"]
+        if issue["state"]["name"] in ["In Progress", "In Training"]
+    ]
+    
     return issues
 
 # ----------------------
