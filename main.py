@@ -133,7 +133,7 @@ def find_notion_page_by_linear_id(database_id, linear_id):
 
 
 def sync_to_notion(issues):
-            properties = {
+        properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
             "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
