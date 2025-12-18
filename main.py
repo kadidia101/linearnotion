@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # ======================
 # CONFIG
@@ -199,7 +199,12 @@ def sync_linear():
     print("\n=== Linear → Notion Sync ===")
 
     last_sync = get_last_linear_sync()
-    print(f"[DEBUG] Last sync: {last_sync}")
+    if last_sync is None:
+    # First run safeguard
+        last_sync = datetime.now(timezone.utc) - timedelta(days=30)
+        print("[DEBUG] No previous sync found, defaulting to 30 days ago")
+    
+    print(f"[DEBUG] Last sync: {last_sync.isoformat()}")
 
     issues = get_linear_issues_updated_since(last_sync)
     print(f"[DEBUG] Found {len(issues)} updated issues")
@@ -217,6 +222,12 @@ def sync_linear():
 
     now = datetime.now(timezone.utc).isoformat()
     update_last_linear_sync(now)
+    
+    new_sync_time = datetime.now(timezone.utc)
+    save_last_sync(new_sync_time)
+    
+    print(f"[DEBUG] Updated last sync timestamp: {new_sync_time.isoformat()}")
+
 
 # ======================
 # ENTRYPOINT
