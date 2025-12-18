@@ -38,14 +38,19 @@ def get_linear_issues(team_id):
             id
             title
             description
-            state { name }
-            priority
-            assignee { id name }
-            project { id name }
-            cycle { number name }  
+            assignee {
+              id
+              name
+            }
+            state {
+              name
+            }
+            cycle { id number name } 
+            labels
+            project { id name }    
             createdAt
-            updatedAt
-            labels { id name }
+            archivedAt
+            priority
           }
         }
       }
@@ -130,9 +135,19 @@ def find_notion_page_by_linear_id(database_id, linear_id):
     results = response.json().get("results", [])
     return results[0] if results else None
 
-
 def sync_to_notion(issues):
-    for issue in issues:
+    last_sync = get_last_sync_time()
+
+    # Only sync issues updated since last sync
+    issues_to_sync = [
+        issue for issue in issues
+        if datetime.fromisoformat(issue["updatedAt"].replace("Z", "+00:00")) > last_sync
+    ]
+
+    for issue in issues_to_sync:
+        page = find_notion_page_by_linear_id(issue["id"])
+
+        # Build Notion properties
         properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
             "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
@@ -140,29 +155,53 @@ def sync_to_notion(issues):
             "Created At": {"date": {"start": issue["createdAt"]}},
             "Status": {"select": {"name": issue["state"]["name"]}},
             "Priority": {"select": {"name": issue.get("priority", "Medium")}},
-            "Labels": {"select": {"name": issue.get("labels", {}).get("name") or "None"}},
-            "Cycle": {"select": {"name": str(issue.get("cycle", {}).get("number", "None"))}},
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
 
-        # Resolve Linear assignee to Notion people
+        # Project (select)
+        project = issue.get("project")
+        if project:
+            properties["Project"] = {"select": {"name": project["name"]}}
+        else:
+            properties["Project"] = None
+
+        # Cycle (single select)
+        cycle = issue.get("cycle")
+        if cycle:
+            properties["Cycle"] = {"select": {"name": str(cycle["number"])}}
+        else:
+            properties["Cycle"] = None
+
+        # Assignee (people)
         people = resolve_linear_assignee_to_notion(issue)
         if people:
             properties["Assignee"] = {"people": people}
 
+        # Labels (multi-select)
+        labels_edges = issue.get("labels", {}).get("edges", [])
+        properties["Labels"] = {
+            "multi_select": [{"name": e["node"]["name"]} for e in labels_edges]
+        } if labels_edges else {"multi_select": []}
+
+        # Create or update page
         try:
-            # Check for existing page
-            page = find_notion_page_by_linear_id(NOTION_DATABASE_ID, issue["id"])
             if page:
                 # Update existing page
                 notion.pages.update(page_id=page["id"], properties=properties)
                 print(f"[INFO] Updated issue '{issue['title']}' in Notion")
             else:
                 # Create new page
-                notion.pages.create(parent={"database_id": NOTION_DATABASE_ID}, properties=properties)
+                notion.pages.create(
+                    parent={"database_id": NOTION_DATABASE_ID},
+                    properties=properties
+                )
                 print(f"[INFO] Created issue '{issue['title']}' in Notion")
         except Exception as e:
             print(f"[ERROR] Failed to sync issue '{issue['title']}': {e}")
+
+    # Save last sync time
+    save_last_sync_time(datetime.utcnow())
+    print(f"[INFO] Sync complete. {len(issues_to_sync)} issues processed.")
 
 # ----------------------
 # MAIN
