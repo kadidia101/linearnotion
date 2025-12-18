@@ -54,6 +54,7 @@ def get_linear_issues(team_id):
                     }
                 }
             }
+            updatedAt
             project { id name }    
             createdAt
             archivedAt
