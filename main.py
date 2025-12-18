@@ -37,43 +37,14 @@ def to_linear_iso(dt: datetime) -> str:
         return dt.replace("+00:00", "Z")
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-def get_linear_issues_updated_since(last_sync: datetime):
-    iso_ts = to_linear_iso(last_sync)
-
-    print(f"[DEBUG] Querying Linear for issues updated after {iso_ts}")
-
-    query = """
-query IssuesUpdatedAfter($updatedAfter: DateTime!) {
-  issues(
-    first: 50
-    filter: {
-      updatedAt: { gt: $updatedAfter }
-    }
-  ) {
-    nodes {
-      id
-      identifier
-      title
-      updatedAt
-      url
-      assignee {
-        email
-        name
-      }
-      state {
-        name
-      }
-      project {
-        name
-      }
-    }
-  }
-}
-"""
-
-    data = linear_query(query, {"updatedAfter": iso_ts})
-    return data["issues"]["nodes"]
-
+def get_linear_issues_updated_since(last_sync):
+    if last_sync.year == 2000:  # first run
+        print("[INFO] First run: fetching all issues")
+        return linear_query(QUERY_ALL_ISSUES)["issues"]["nodes"]
+    else:
+        iso_ts = last_sync.isoformat()
+        print(f"[DEBUG] Querying Linear for issues updated after {iso_ts}")
+        return linear_query(QUERY_UPDATED_ISSUES, {"updatedAfter": iso_ts})["issues"]["nodes"]
 
 
 # ======================
@@ -140,15 +111,15 @@ def get_notion_user_id_by_email(email):
 
 def get_last_linear_sync():
     page = get_notion_page(SYNC_STATUS_PAGE_ID)
-    prop = page["properties"].get("Last Linear Sync")
+    last_sync_str = page.get("properties", {}).get("Last Sync", {}).get("rich_text", [])
+    
+    if not last_sync_str:
+        # First run — return a very old date to fetch everything
+        return datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    
+    last_sync = datetime.datetime.fromisoformat(last_sync_str[0]["text"]["content"])
+    return last_sync
 
-    if not prop or not prop["date"] or not prop["date"]["start"]:
-        # first run fallback
-        return datetime.now(timezone.utc) - timedelta(days=30)
-
-    # Parse ISO string from Notion
-    iso_str = prop["date"]["start"].replace("Z", "+00:00")
-    return datetime.fromisoformat(iso_str)
 
 def update_last_linear_sync(ts):
     update_notion_page(
