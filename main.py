@@ -15,6 +15,27 @@ LINEAR_ENDPOINT = "https://api.linear.app/graphql"
 NOTION_BASE_URL = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 
+QUERY_ALL_ISSUES = """
+query {
+  issues {
+    nodes {
+      id
+      title
+      description
+      state {
+        name
+      }
+      assignee {
+        id
+        name
+      }
+      updatedAt
+      createdAt
+    }
+  }
+}
+"""
+
 # ======================
 # LINEAR HELPERS
 # ======================
