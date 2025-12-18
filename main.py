@@ -121,7 +121,7 @@ def sync_to_notion(issues):
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
             "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
-            "Created At": {"date": {"start": issue["createdAt"]}}
+            "Created At": {"date": {"start": issue["createdAt"]}},
             "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Training
             "Priority": {"select": {"name": issue.get("priority", "Medium")}},  # Adjust default as needed
             "Project": {"select": {"name": issue.get("project_name", "None")}},  # Replace with actual field
