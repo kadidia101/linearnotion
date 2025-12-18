@@ -112,7 +112,7 @@ def resolve_linear_assignee_to_notion(issue):
 # STEP 2: Sync issues to Notion
 # ----------------------
 def find_notion_page_by_linear_id(linear_id):
-    results = notion.databases.query(
+    results = notion.databases.query_database(
         database_id=NOTION_DATABASE_ID,
         filter={
             "property": "Linear ID",
@@ -120,8 +120,9 @@ def find_notion_page_by_linear_id(linear_id):
         }
     )
     if results["results"]:
-        return results["results"][0]  # return the first match
+        return results["results"][0]
     return None
+
     
 def split_rich_text(text, chunk_size=2000):
     """
