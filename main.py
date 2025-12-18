@@ -82,33 +82,45 @@ def get_all_linear_issues():
         "Content-Type": "application/json"
     }
 
+    # GraphQL query: get first 100 issues with selected states
     query = """
     query {
-      issues(first: 100) {
+      issues(first: 100, filter: { state: { name_in: ["In Progress", "In Testing"] } }) {
         nodes {
           id
           identifier
           title
           description
+          state {
+            name
+          }
           createdAt
           updatedAt
+          assignee {
+            id
+            name
+            email
+          }
+          project {
+            id
+            name
+          }
         }
       }
     }
     """
 
     payload = {"query": query}
-
     response = requests.post("https://api.linear.app/graphql", json=payload, headers=headers)
-    response.raise_for_status()
-
-    data = response.json()
-    if "errors" in data:
-        raise Exception(f"Linear API returned errors: {data['errors']}")
     
-    return data["data"]["issues"]["nodes"]
-
-
+    # Will raise HTTPError if 400 or 401, etc.
+    response.raise_for_status()
+    data = response.json()
+    
+    # Extract issue nodes
+    issues = data.get("data", {}).get("issues", {}).get("nodes", [])
+    print(f"[DEBUG] Retrieved {len(issues)} issues from Linear")
+    return issues
 # ======================
 # NOTION HELPERS
 # ======================
