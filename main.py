@@ -122,11 +122,15 @@ def get_notion_user_id_by_email(email):
 
 def get_last_linear_sync():
     page = get_notion_page(SYNC_STATUS_PAGE_ID)
-    prop = page["properties"].get("Last Linear Sync", {})
-    date = prop.get("date")
-    if date and date.get("start"):
-        return date["start"]
-    return "1970-01-01T00:00:00Z"
+    prop = page["properties"].get("Last Linear Sync")
+
+    if not prop or not prop["date"] or not prop["date"]["start"]:
+        # first run fallback
+        return datetime.now(timezone.utc) - timedelta(days=30)
+
+    # Parse ISO string from Notion
+    iso_str = prop["date"]["start"].replace("Z", "+00:00")
+    return datetime.fromisoformat(iso_str)
 
 def update_last_linear_sync(ts):
     update_notion_page(
