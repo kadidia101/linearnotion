@@ -74,9 +74,9 @@ def get_linear_issues(team_id):
         else:
             break
 
-    # Filter only "In Progress" or "In Training"
-    issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Training"]]
-    print(f"[INFO] Fetched {len(issues)} issues in progress/in training from Linear")
+    # Filter only "In Progress" or "In Testing"
+    issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Testing"]]
+    print(f"[INFO] Fetched {len(issues)} issues in progress/in testing from Linear")
     return issues
 
     
@@ -97,20 +97,17 @@ def get_notion_user_id_by_email(email):
     
 def resolve_linear_assignee_to_notion(issue):
     """
-    Convert Linear assignee to Notion people property.
+    Convert Linear assignees to Notion people property.
     Returns a list of dicts like [{"id": "NOTION_USER_ID"}].
     """
-    assignee = issue.get("assignee")
-    if not assignee:
-        return []  # Unassigned
-
-    # Map Linear assignee to Notion user ID
-    notion_user_id = get_notion_user_id_by_email(assignee["name"])  # or implement name → user ID mapping
-
-    if notion_user_id:
-        return [{"id": notion_user_id}]
-    return []
-
+    assignees = issue.get("assignees") or [issue.get("assignee")]  # If Linear supports multiple assignees
+    people = []
+    for assignee in assignees:
+        if assignee:
+            notion_user_id = get_notion_user_id_by_email(assignee["name"])
+            if notion_user_id:
+                people.append({"id": notion_user_id})
+    return people
 # ----------------------
 # STEP 2: Sync issues to Notion
 # ----------------------
@@ -122,7 +119,7 @@ def sync_to_notion(issues):
             "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
             "Created At": {"date": {"start": issue["createdAt"]}},
-            "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Training
+            "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Testing
             "Priority": {"select": {"name": issue.get("priority", "Medium")}},  # Adjust default as needed
             "Project": {"select": {"name": issue.get("project_name", "None")}},  # Replace with actual field
             "Team": {"select": {"name": issue.get("team_name", "None")}},       # Replace with actual field
@@ -151,7 +148,7 @@ def sync_to_notion(issues):
 if __name__ == "__main__":
     TEAM_ID = "b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6"  # <-- PLACE YOUR TEAM ID HERE
     issues = get_linear_issues(TEAM_ID)
-    print(f"Found {len(issues)} issues in progress/in training.")
+    print(f"Found {len(issues)} issues in progress/in testing.")
     sync_to_notion(issues)
     print("Sync complete.")
 
