@@ -27,6 +27,7 @@ LINEAR_PRIORITY_MAP = {
     4: "Urgent"
 }
 
+LAST_SYNC_FILE = "last_sync.txt"
 # ----------------------
 # STEP 1: Define GraphQL query to get issues for a team
 # ----------------------
@@ -131,6 +132,7 @@ def resolve_linear_assignee_to_notion(issue):
 # ----------------------
 # STEP 2: Sync issues to Notion
 # ----------------------
+
 def find_notion_page_by_linear_id(linear_id):
     url = f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query"
     payload = {
@@ -144,7 +146,6 @@ def find_notion_page_by_linear_id(linear_id):
     results = response.json().get("results", [])
     return results[0] if results else None
 
-
     
 def split_rich_text(text, chunk_size=2000):
     """
@@ -152,35 +153,39 @@ def split_rich_text(text, chunk_size=2000):
     """
     return [{"text": {"content": text[i:i+chunk_size]}} for i in range(0, len(text), chunk_size)]
 
+def get_last_sync_time(file_path=LAST_SYNC_FILE):
+    try:
+        with open(file_path, "r") as f:
+            ts = f.read().strip()
+            return datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
+    except Exception:
+        # Default far in the past if file doesn't exist
+        return datetime(2000, 1, 1, tzinfo=timezone.utc)
+
+def save_last_sync_time(timestamp, file_path=LAST_SYNC_FILE):
+    with open(file_path, "w") as f:
+        f.write(timestamp.isoformat())
 
 def sync_to_notion(issues):
+    last_sync = get_last_sync_time()
+    issues_to_sync = []
+
+    # Step 1: filter only issues updated since last sync
     for issue in issues:
-       # properties = {
-       #     "Title": {"title": [{"text": {"content": issue["title"]}}]},
-       #     "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
-       #     "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
-        #    "Created At": {"date": {"start": issue["createdAt"]}},
-         #   "Status": {"select": {"name": issue["state"]["name"]}},
-          #  "Project": {"select": {"name": issue["project"]["name"] if issue.get("project") else "None"}},
- #           "Cycle": {"select": {"name": str(issue["cycle"]["number"])}} if issue.get("cycle") else {"select": {"name": "None"}},
-#            "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}  
-#        }
-        
-#        # Priority
-#        raw_priority = issue.get("priority", 2)  # default Medium
-#        priority_name = LINEAR_PRIORITY_MAP.get(raw_priority, "Medium") if isinstance(raw_priority, int) else str(raw_priority).capitalize()
-#        properties["Priority"] = {"select": {"name": priority_name}}
-        
-        # Assignee (people)
-#        people = resolve_linear_assignee_to_notion(issue)
-#        if people:
-#            properties["Assignee"] = {"people": people}
-        
-        # Labels (multi-select)
-#        labels_edges = issue.get("labels", {}).get("edges", [])
- #       properties["Labels"] = {
- #           "multi_select": [{"name": e["node"]["name"]} for e in labels_edges]
-#        } if labels_edges else {"multi_select": []}
+        updated_at_str = issue.get("updatedAt") or issue.get("createdAt")
+        updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
+
+        if updated_at > last_sync:
+            issues_to_sync.append(issue)
+            print(f"[DEBUG] Will sync '{issue['title']}' updated at {updated_at}")
+        else:
+            print(f"[DEBUG] Skipping '{issue['title']}', last updated at {updated_at}")
+
+    print(f"[INFO] {len(issues)} issues fetched from Linear")
+    print(f"[INFO] {len(issues_to_sync)} issues to process")
+
+    # Step 2: build properties and create/update Notion pages
+    for issue in issues_to_sync:
 
         properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
