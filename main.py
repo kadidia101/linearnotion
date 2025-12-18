@@ -147,9 +147,11 @@ def get_last_sync_time(file_path="last_sync.txt"):
     try:
         with open(file_path, "r") as f:
             ts = f.read().strip()
-            return datetime.fromisoformat(ts)
+            # Add UTC timezone
+            return datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
     except Exception:
-        return datetime.fromisoformat("2000-01-01T00:00:00")
+        return datetime(2000, 1, 1, tzinfo=timezone.utc)
+
 
 def save_last_sync_time(timestamp, file_path="last_sync.txt"):
     with open(file_path, "w") as f:
