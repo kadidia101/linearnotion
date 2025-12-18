@@ -21,7 +21,7 @@ import requests
 def get_linear_issues(team_id):
     url = "https://api.linear.app/graphql"
     headers = {
-        "Authorization": f"Bearer {LINEAR_API_KEY}",
+        "Authorization": f"{LINEAR_API_KEY}",
         "Content-Type": "application/json"
     }
     
