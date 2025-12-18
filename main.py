@@ -15,27 +15,6 @@ LINEAR_ENDPOINT = "https://api.linear.app/graphql"
 NOTION_BASE_URL = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 
-QUERY_ALL_ISSUES = """
-query {
-  issues {
-    nodes {
-      id
-      title
-      description
-      state {
-        name
-      }
-      assignee {
-        id
-        name
-      }
-      updatedAt
-      createdAt
-    }
-  }
-}
-"""
-
 # ======================
 # LINEAR HELPERS
 # ======================
@@ -59,14 +38,61 @@ def to_linear_iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 def get_linear_issues_updated_since(last_sync):
-    if last_sync.year == 2000:  # first run
-        print("[INFO] First run: fetching all issues")
-        return linear_query(QUERY_ALL_ISSUES)["issues"]["nodes"]
-    else:
-        iso_ts = last_sync.isoformat()
-        print(f"[DEBUG] Querying Linear for issues updated after {iso_ts}")
-        return linear_query(QUERY_UPDATED_ISSUES, {"updatedAfter": iso_ts})["issues"]["nodes"]
+    """
+    Fetch issues from Linear updated since last_sync.
+    If last_sync is None or very old, fetch all issues.
+    """
+    headers = {
+        "Authorization": f"Bearer {LINEAR_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
+    # GraphQL query with variable for incremental fetch
+    query = """
+    query($updatedAfter: DateTime) {
+      issues(updatedAfter: $updatedAfter, first: 100) {
+        nodes {
+          id
+          identifier
+          title
+          description
+          createdAt
+          updatedAt
+          state {
+            name
+          }
+          assignee {
+            name
+            email
+          }
+          labels {
+            nodes {
+              name
+            }
+          }
+        }
+      }
+    }
+    """
+
+    variables = {}
+    if last_sync:
+        # ensure string in ISO 8601 format
+        variables["updatedAfter"] = last_sync.isoformat()
+
+    response = requests.post(
+        LINEAR_ENDPOINT,
+        json={"query": query, "variables": variables},
+        headers=headers
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    # Safety check in case Linear returns errors
+    if "errors" in data:
+        raise Exception(f"Linear API returned errors: {data['errors']}")
+
+    return data["data"]["issues"]["nodes"]
 
 # ======================
 # NOTION HELPERS
