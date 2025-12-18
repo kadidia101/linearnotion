@@ -162,13 +162,25 @@ def sync_to_notion(issues):
             "Created At": {"date": {"start": issue["createdAt"]}},
             "Status": {"select": {"name": issue["state"]["name"]}},
             "Project": {"select": {"name": issue["project"]["name"] if issue.get("project") else "None"}},
-            "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
+            "Cycle": {"select": {"name": str(issue["cycle"]["number"])}} if issue.get("cycle") else {"select": {"name": "None"}},
+            "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}  
         }
-
-        # Resolve Linear assignee to Notion people (single for now)
+        
+        # Priority
+        raw_priority = issue.get("priority", 2)  # default Medium
+        priority_name = LINEAR_PRIORITY_MAP.get(raw_priority, "Medium") if isinstance(raw_priority, int) else str(raw_priority).capitalize()
+        properties["Priority"] = {"select": {"name": priority_name}}
+        
+        # Assignee (people)
         people = resolve_linear_assignee_to_notion(issue)
         if people:
             properties["Assignee"] = {"people": people}
+        
+        # Labels (multi-select)
+        labels_edges = issue.get("labels", {}).get("edges", [])
+        properties["Labels"] = {
+            "multi_select": [{"name": e["node"]["name"]} for e in labels_edges]
+        } if labels_edges else {"multi_select": []}
 
         # Check if page already exists in Notion
         page = find_notion_page_by_linear_id(issue["id"])  # you will implement this
