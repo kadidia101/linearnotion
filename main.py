@@ -141,8 +141,8 @@ def sync_to_notion(issues):
             "Created At": {"date": {"start": issue["createdAt"]}},
             "Status": {"select": {"name": issue["state"]["name"]}},
             "Priority": {"select": {"name": issue.get("priority", "Medium")}},
-            "Project": {"select": {"name": issue.get("project", {}).get("name", "None")}},
-            "Team": {"select": {"name": issue.get("team", {}).get("name", "None")}},
+            "Labels": {"select": {"name": issue.get("labels", {}).get("name") or "None"}},
+            "Cycle": {"select": {"name": str(issue.get("cycle", {}).get("number", "None"))}},
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
 
