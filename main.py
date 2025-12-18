@@ -248,8 +248,15 @@ def sync_to_notion(issues):
 # ----------------------
 if __name__ == "__main__":
     TEAM_ID = "b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6"  # <-- PLACE YOUR TEAM ID HERE
-    issues = get_linear_issues(TEAM_ID)
-    print(f"Found {len(issues)} issues in progress/in testing.")
-    sync_to_notion(issues)
-    print("Sync complete.")
-    print("Sync complete.")
+    
+    while True:
+        try:
+            issues = get_linear_issues(TEAM_ID)
+            print(f"Found {len(issues)} issues in progress/in testing.")
+            sync_to_notion(issues)
+            print("Sync complete.\n")
+        except Exception as e:
+            print(f"[ERROR] Something went wrong: {e}")
+        
+        # Wait 60 seconds before next sync
+        time.sleep(60)
