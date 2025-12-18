@@ -11,7 +11,7 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DB_LINEAR")
 SYNC_STATUS_PAGE_ID = os.environ.get("SYNC_STATUS_PAGE_ID")
 
-LINEAR_ENDPOINT = "https://api.linear.app/graphql"
+LINEAR_URL = "https://api.linear.app/graphql"
 NOTION_BASE_URL = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 
