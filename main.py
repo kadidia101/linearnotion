@@ -251,18 +251,9 @@ def find_existing_page(linear_id):
 # ======================
 
 def sync_linear():
-    print("\n=== Linear → Notion Sync ===")
-
-    last_sync = get_last_linear_sync()
-    if last_sync is None:
-    # First run safeguard
-        last_sync = datetime.now(timezone.utc) - timedelta(days=30)
-        print("[DEBUG] No previous sync found, defaulting to 30 days ago")
-    
-    print(f"[DEBUG] Last sync: {last_sync.isoformat()}")
-
-    issues = get_all_linear_issues(last_sync)
-    print(f"[DEBUG] Found {len(issues)} updated issues")
+    print("=== Linear → Notion Sync ===")
+    issues = get_all_linear_issues()
+    print(f"[DEBUG] Retrieved {len(issues)} issues from Linear")
 
     for issue in issues:
         props = build_notion_properties(issue)
