@@ -241,7 +241,8 @@ def sync_to_notion(issues):
         except Exception as e:
             print(f"[ERROR] Failed to sync issue '{issue['title']}': {e}")
 
-
+    save_last_sync_time(datetime.utcnow().replace(tzinfo=timezone.utc))
+    print(f"[INFO] Sync complete. {len(issues_to_sync)} issues processed.")
 # ----------------------
 # MAIN
 # ----------------------
