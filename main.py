@@ -112,14 +112,14 @@ def resolve_linear_assignee_to_notion(issue):
 # STEP 2: Sync issues to Notion
 # ----------------------
 def find_notion_page_by_linear_id(linear_id):
-    results = notion.databases.query_database(
+    results = notion.databases.query(
         database_id=NOTION_DATABASE_ID,
         filter={
             "property": "Linear ID",
             "rich_text": {"equals": linear_id}
         }
     )
-    if results["results"]:
+    if results.get("results"):
         return results["results"][0]
     return None
 
