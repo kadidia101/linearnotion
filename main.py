@@ -1,6 +1,7 @@
 import os
 import requests
 from datetime import datetime, timezone
+from notion_client import Client
 
 # ======================
 # CONFIG
@@ -9,199 +10,76 @@ from datetime import datetime, timezone
 LINEAR_API_KEY = os.environ.get("LINEAR_API_KEY")
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DB_LINEAR")
-SYNC_STATUS_PAGE_ID = os.environ.get("SYNC_STATUS_PAGE_ID")
 
-LINEAR_URL = "https://api.linear.app/graphql"
-NOTION_BASE_URL = "https://api.notion.com/v1"
-NOTION_VERSION = "2022-06-28"
+notion = Client(auth=NOTION_TOKEN)
 
-# ======================
-# LINEAR HELPERS
-# ======================
-
-def linear_query(query, variables=None):
+# ----------------------
+# STEP 1: Define GraphQL query to get issues for a team
+# ----------------------
+def get_linear_issues(team_id):
+    url = "https://api.linear.app/graphql"
     headers = {
         "Authorization": f"Bearer {LINEAR_API_KEY}",
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
     }
-    r = requests.post(LINEAR_URL, headers=headers, json={"query": query, "variables": variables or {}})
-    r.raise_for_status()
-    data = r.json()
-    if "errors" in data:
-        raise Exception(f"Linear API returned errors: {data['errors']}")
-    return data["data"]
-
-def get_teams():
+    
     query = """
-    query Teams {
-      teams {
-        nodes {
-          id
-          name
+    query Team($teamId: String!) {
+      team(id: $teamId) {
+        id
+        name
+        issues(filter: {state: {name: {in: ["In Progress", "In Training"]}}}) {
+          nodes {
+            id
+            title
+            description
+            assignee {
+              id
+              name
+            }
+            createdAt
+            archivedAt
+          }
         }
       }
     }
     """
-    data = linear_query(query)
-    return data["teams"]["nodes"]
-
-def get_issues_for_team(team_id):
-    query = f"""
-    query Team {{
-      team(id: {team_id}) {{
-        id
-        name
-        issues {{
-          nodes {{
-            id
-            identifier
-            title
-            description
-            url
-            state {{
-              name
-            }}
-            priority
-            createdAt
-            updatedAt
-            assignee {{
-              email
-              name
-            }}
-          }}
-        }}
-      }}
-    }}
-    """
-    data = linear_query(query)
-    return data["team"]["issues"]["nodes"]
-
     
-
-def get_all_linear_issues():
-    """Fetch all issues from all teams."""
-    issues = []
-    teams = get_teams()
-    for team in teams:
-        team_issues = get_issues_for_team(team["id"])
-        issues.extend(team_issues)
+    variables = {"teamId": b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6} 
+    
+    response = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    
+    issues = data["data"]["team"]["issues"]["nodes"]
     return issues
 
-# ======================
-# NOTION HELPERS
-# ======================
-
-def notion_headers():
-    return {
-        "Authorization": f"Bearer {NOTION_TOKEN}",
-        "Notion-Version": NOTION_VERSION,
-        "Content-Type": "application/json",
-    }
-
-def get_notion_page(page_id):
-    r = requests.get(f"{NOTION_BASE_URL}/pages/{page_id}", headers=notion_headers())
-    r.raise_for_status()
-    return r.json()
-
-def update_notion_page(page_id, properties):
-    r = requests.patch(f"{NOTION_BASE_URL}/pages/{page_id}", headers=notion_headers(), json={"properties": properties})
-    r.raise_for_status()
-
-def query_notion_database(database_id, payload):
-    r = requests.post(f"{NOTION_BASE_URL}/databases/{database_id}/query", headers=notion_headers(), json=payload)
-    r.raise_for_status()
-    return r.json()["results"]
-
-def create_notion_item(database_id, properties):
-    r = requests.post(f"{NOTION_BASE_URL}/pages", headers=notion_headers(), json={"parent": {"database_id": database_id}, "properties": properties})
-    r.raise_for_status()
-
-def get_notion_user_id_by_email(email):
-    r = requests.get(f"{NOTION_BASE_URL}/users", headers=notion_headers())
-    r.raise_for_status()
-    for user in r.json()["results"]:
-        if user.get("person", {}).get("email") == email:
-            return user["id"]
-    return None
-
-# ======================
-# SYNC STATE
-# ======================
-
-def get_last_linear_sync():
-    page = get_notion_page(SYNC_STATUS_PAGE_ID)
-    last_sync_text = page.get("properties", {}).get("Last Linear Sync", {}).get("rich_text", [])
-    if not last_sync_text:
-        # First run — return a very old date
-        return datetime(2000, 1, 1, tzinfo=timezone.utc)
-    last_sync = datetime.fromisoformat(last_sync_text[0]["text"]["content"])
-    return last_sync
-
-def update_last_linear_sync(ts: str):
-    update_notion_page(
-        SYNC_STATUS_PAGE_ID,
-        {
-            "Last Linear Sync": {
-                "rich_text": [{"text": {"content": ts}}]
-            }
-        }
-    )
-    print(f"[DEBUG] Updated last Linear sync → {ts}")
-
-# ======================
-# NOTION MAPPING
-# ======================
-
-def build_notion_properties(issue):
-    props = {
-        "Title": {"title": [{"text": {"content": issue["title"]}}]},
-        "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
-        "Linear URL": {"url": issue.get("url")},
-        "Priority": {"number": issue.get("priority")},
-        "Created At": {"date": {"start": issue.get("createdAt")}},
-        "Updated At": {"date": {"start": issue.get("updatedAt")}},
-    }
-    if issue.get("state"):
-        props["Status"] = {"select": {"name": issue["state"]["name"]}}
-    if issue.get("assignee") and issue["assignee"].get("email"):
-        user_id = get_notion_user_id_by_email(issue["assignee"]["email"])
-        if user_id:
-            props["Assignee"] = {"people": [{"id": user_id}]}
-    return props
-
-def find_existing_page(linear_id):
-    results = query_notion_database(
-        NOTION_DATABASE_ID,
-        {"filter": {"property": "Linear ID", "rich_text": {"equals": linear_id}}},
-    )
-    return results[0] if results else None
-
-# ======================
-# MAIN SYNC
-# ======================
-
-def sync_linear():
-    print("=== Linear → Notion Sync ===")
-    issues = get_all_linear_issues()
-    print(f"[DEBUG] Retrieved {len(issues)} issues from Linear")
-
+# ----------------------
+# STEP 2: Sync issues to Notion
+# ----------------------
+def sync_to_notion(issues):
     for issue in issues:
-        props = build_notion_properties(issue)
-        existing = find_existing_page(issue["id"])
-        if existing:
-            update_notion_page(existing["id"], props)
-            print(f"[UPDATED] {issue['title']}")
-        else:
-            create_notion_item(NOTION_DATABASE_ID, props)
-            print(f"[CREATED] {issue['title']}")
+        # Check if issue already exists in Notion
+        # (Optional: implement deduplication here if you want)
+        
+        notion.pages.create(
+            parent={"database_id": NOTION_DATABASE_ID},
+            properties={
+                "Title": {"title": [{"text": {"content": issue["title"]}}]},
+                "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
+                "Assignee": {"rich_text": [{"text": {"content": issue["assignee"]["name"] if issue["assignee"] else "Unassigned"}}]},
+                "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
+                "Created At": {"date": {"start": issue["createdAt"]}}
+            }
+        )
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    update_last_linear_sync(now_iso)
-    print(f"[DEBUG] Updated last sync timestamp: {now_iso}")
-
-# ======================
-# ENTRYPOINT
-# ======================
-
+# ----------------------
+# MAIN
+# ----------------------
 if __name__ == "__main__":
-    sync_linear()
+    TEAM_ID = "your_team_id_here"  # <-- PLACE YOUR TEAM ID HERE
+    issues = get_linear_issues(TEAM_ID)
+    print(f"Found {len(issues)} issues in progress/in training.")
+    sync_to_notion(issues)
+    print("Sync complete.")
+
