@@ -164,15 +164,21 @@ def save_last_sync_time(timestamp, file_path="last_sync.txt"):
     with open(file_path, "w") as f:
         f.write(timestamp.isoformat())
 
-
 def sync_to_notion(issues):
     last_sync = get_last_sync_time()
+    first_run = last_sync.year == 2000  # our default fallback
 
-    # Only sync issues updated since last sync
-    issues_to_sync = [
-        issue for issue in issues
-        if datetime.fromisoformat(issue.get("updatedAt", issue.get("createdAt")).replace("Z", "+00:00")) > last_sync
-    ]
+    # Only sync issues updated since last sync, unless first run
+    if first_run:
+        issues_to_sync = issues
+    else:
+        issues_to_sync = [
+            issue for issue in issues
+            if datetime.fromisoformat(issue.get("updatedAt", issue.get("createdAt")).replace("Z", "+00:00")) > last_sync
+        ]
+
+    print(f"[INFO] {len(issues)} issues fetched from Linear")
+    print(f"[INFO] {len(issues_to_sync)} issues to process")
 
     for issue in issues_to_sync:
         page = find_notion_page_by_linear_id(issue["id"])
@@ -237,6 +243,7 @@ def sync_to_notion(issues):
     # Save last sync time
     save_last_sync_time(datetime.utcnow())
     print(f"[INFO] Sync complete. {len(issues_to_sync)} issues processed.")
+    
 # ----------------------
 # MAIN
 # ----------------------
