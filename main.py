@@ -6,10 +6,10 @@ from datetime import datetime, timezone, timedelta
 # CONFIG
 # ======================
 
-LINEAR_API_KEY = os.environ("LINEAR_API_KEY")
-NOTION_TOKEN = os.environ("NOTION_TOKEN")
-NOTION_DATABASE_ID = os.environ("NOTION_DB_LINEAR")
-SYNC_STATUS_PAGE_ID = os.environ("SYNC_STATUS_PAGE_ID")
+LINEAR_API_KEY = os.environ.get("LINEAR_API_KEY")
+NOTION_TOKEN = os.environ.get("NOTION_TOKEN")
+NOTION_DATABASE_ID = os.environ.get("NOTION_DB_LINEAR")
+SYNC_STATUS_PAGE_ID = os.environ.get("SYNC_STATUS_PAGE_ID")
 
 LINEAR_ENDPOINT = "https://api.linear.app/graphql"
 NOTION_BASE_URL = "https://api.notion.com/v1"
