@@ -38,15 +38,14 @@ def get_linear_issues(team_id):
             id
             title
             description
-            assignee {
-              id
-              name
-            }
-            state {
-              name
-            }
+            state { name }
+            priority
+            assignee { id name }
+            project { id name }
+            cycle { number name }  
             createdAt
-            archivedAt
+            updatedAt
+            labels { id name }
           }
         }
       }
@@ -133,6 +132,7 @@ def find_notion_page_by_linear_id(database_id, linear_id):
 
 
 def sync_to_notion(issues):
+    for issue in issues:
         properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
             "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
@@ -140,29 +140,15 @@ def sync_to_notion(issues):
             "Created At": {"date": {"start": issue["createdAt"]}},
             "Status": {"select": {"name": issue["state"]["name"]}},
             "Priority": {"select": {"name": issue.get("priority", "Medium")}},
+            "Labels": {"select": {"name": issue.get("labels", {}).get("name") or "None"}},
+            "Cycle": {"select": {"name": str(issue.get("cycle", {}).get("number", "None"))}},
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
-        
-        # Project
-        project = issue.get("project")
-        if project:
-            properties["Project"] = {"select": {"name": project["name"]}}
-        else:
-            properties["Project"] = None
-        
-        # Cycle
-        cycle = issue.get("cycle")
-        properties["Cycle"] = {"select": {"name": str(cycle["number"])}} if cycle else None
-        
-        # Assignee
+
+        # Resolve Linear assignee to Notion people
         people = resolve_linear_assignee_to_notion(issue)
         if people:
             properties["Assignee"] = {"people": people}
-        
-        # Labels (multi-select)
-        labels = issue.get("labels", [])
-        properties["Labels"] = {"multi_select": [{"name": l["name"]} for l in labels]} if labels else {"multi_select": []}
-
 
         try:
             # Check for existing page
@@ -187,4 +173,3 @@ if __name__ == "__main__":
     print(f"Found {len(issues)} issues in progress/in testing.")
     sync_to_notion(issues)
     print("Sync complete.")
-
