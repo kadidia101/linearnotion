@@ -16,22 +16,18 @@ notion = Client(auth=NOTION_TOKEN)
 # ----------------------
 # STEP 1: Define GraphQL query to get issues for a team
 # ----------------------
-import requests
-
 def get_linear_issues(team_id):
     url = "https://api.linear.app/graphql"
-    headers = {
-        "Authorization": f"{LINEAR_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    # Updated query: fetch all issues with their state name
+    headers = {"Authorization": LINEAR_API_KEY, "Content-Type": "application/json"}
+
     query = """
-    query Team($teamId: String!) {
+    query TeamIssues($teamId: String!, $after: String) {
       team(id: $teamId) {
-        id
-        name
-        issues {
+        issues(first: 50, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
           nodes {
             id
             title
@@ -50,44 +46,70 @@ def get_linear_issues(team_id):
       }
     }
     """
-    
-    variables = {"teamId": team_id}  # <-- Make sure this is the UUID from Linear
-    
-    response = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
-    
-    # Debug: print Linear response if it fails
-    if response.status_code != 200:
-        print("Linear API response:", response.text)
-        response.raise_for_status()
-    
-    data = response.json()
-    
-    # Filter issues in Python
-    issues = [
-        issue for issue in data["data"]["team"]["issues"]["nodes"]
-        if issue["state"]["name"] in ["In Progress", "In Training"]
-    ]
-    
+
+    all_issues = []
+    after = None
+
+    while True:
+        variables = {"teamId": team_id, "after": after}
+        response = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
+        data = response.json()
+        nodes = data["data"]["team"]["issues"]["nodes"]
+        all_issues.extend(nodes)
+        page_info = data["data"]["team"]["issues"]["pageInfo"]
+        if page_info["hasNextPage"]:
+            after = page_info["endCursor"]
+        else:
+            break
+
+    # Filter in-progress/in-training
+    issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Training"]]
     return issues
+
+def resolve_linear_assignee_to_notion(issue):
+    """
+    Convert Linear assignee to Notion people property.
+    Returns a list of dicts like [{"id": "NOTION_USER_ID"}].
+    """
+    assignee = issue.get("assignee")
+    if not assignee:
+        return []  # Unassigned
+
+    # Map Linear assignee to Notion user ID
+    notion_user_id = get_notion_user_id_by_email(assignee["name"])  # or implement name → user ID mapping
+
+    if notion_user_id:
+        return [{"id": notion_user_id}]
+    return []
 
 # ----------------------
 # STEP 2: Sync issues to Notion
 # ----------------------
 def sync_to_notion(issues):
     for issue in issues:
-        # Check if issue already exists in Notion
-        # (Optional: implement deduplication here if you want)
-        
-        notion.pages.create(
-            parent={"database_id": NOTION_DATABASE_ID},
-            properties={
-                "Title": {"title": [{"text": {"content": issue["title"]}}]},
-                "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
-                "Assignee": {"rich_text": [{"text": {"content": issue["assignee"]["name"] if issue["assignee"] else "Unassigned"}}]},
-                "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
-                "Created At": {"date": {"start": issue["createdAt"]}}
-            }
-        )
+        # Base properties
+        properties = {
+            "Title": {"title": [{"text": {"content": issue["title"]}}]},
+            "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
+            "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
+            "Created At": {"date": {"start": issue["createdAt"]}}
+        }
+
+        # Resolve Linear assignee to Notion people
+        people = resolve_linear_assignee_to_notion(issue)
+        if people:
+            properties["Assignee"] = {"people": people}
+
+        # Create the page in Notion
+        try:
+            notion.pages.create(
+                parent={"database_id": NOTION_DATABASE_ID},
+                properties=properties
+            )
+            print(f"[INFO] Synced issue '{issue['title']}' to Notion")
+        except Exception as e:
+            print(f"[ERROR] Failed to sync issue '{issue['title']}': {e}")
+
 
 # ----------------------
 # MAIN
