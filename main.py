@@ -36,7 +36,6 @@ def to_linear_iso(dt: datetime) -> str:
     if isinstance(dt, str):
         return dt.replace("+00:00", "Z")
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
 def get_linear_issues_updated_since(last_sync):
     headers = {
         "Authorization": f"Bearer {LINEAR_API_KEY}",
@@ -45,7 +44,7 @@ def get_linear_issues_updated_since(last_sync):
 
     query = """
     query($updatedAfter: DateTime) {
-      issues(updatedAfter: $updatedAfter, first: 100) {
+      issues(first: 100, updatedAfter: $updatedAfter) {
         nodes {
           id
           identifier
@@ -59,7 +58,8 @@ def get_linear_issues_updated_since(last_sync):
     """
 
     variables = {}
-    if last_sync is not None and last_sync.year > 2000:
+    # Only send updatedAfter if last_sync is not the dummy 2000-01-01
+    if last_sync and last_sync.year > 2000:
         iso_ts = last_sync.replace(microsecond=0).isoformat()
         if iso_ts.endswith("+00:00"):
             iso_ts = iso_ts.replace("+00:00", "Z")
@@ -69,12 +69,13 @@ def get_linear_issues_updated_since(last_sync):
     if variables:
         payload["variables"] = variables
 
-    response = requests.post(LINEAR_URL, json=payload, headers=headers)
+    response = requests.post("https://api.linear.app/graphql", json=payload, headers=headers)
     response.raise_for_status()
     data = response.json()
     if "errors" in data:
         raise Exception(f"Linear API returned errors: {data['errors']}")
     return data["data"]["issues"]["nodes"]
+
 
 
 # ======================
