@@ -155,18 +155,45 @@ def split_rich_text(text, chunk_size=2000):
 
 def sync_to_notion(issues):
     for issue in issues:
+       # properties = {
+       #     "Title": {"title": [{"text": {"content": issue["title"]}}]},
+       #     "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
+       #     "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
+        #    "Created At": {"date": {"start": issue["createdAt"]}},
+         #   "Status": {"select": {"name": issue["state"]["name"]}},
+          #  "Project": {"select": {"name": issue["project"]["name"] if issue.get("project") else "None"}},
+ #           "Cycle": {"select": {"name": str(issue["cycle"]["number"])}} if issue.get("cycle") else {"select": {"name": "None"}},
+#            "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}  
+#        }
+        
+#        # Priority
+#        raw_priority = issue.get("priority", 2)  # default Medium
+#        priority_name = LINEAR_PRIORITY_MAP.get(raw_priority, "Medium") if isinstance(raw_priority, int) else str(raw_priority).capitalize()
+#        properties["Priority"] = {"select": {"name": priority_name}}
+        
+        # Assignee (people)
+#        people = resolve_linear_assignee_to_notion(issue)
+#        if people:
+#            properties["Assignee"] = {"people": people}
+        
+        # Labels (multi-select)
+#        labels_edges = issue.get("labels", {}).get("edges", [])
+ #       properties["Labels"] = {
+ #           "multi_select": [{"name": e["node"]["name"]} for e in labels_edges]
+#        } if labels_edges else {"multi_select": []}
+
         properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
             "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
             "Created At": {"date": {"start": issue["createdAt"]}},
-            "Status": {"select": {"name": issue["state"]["name"]}},
-            "Project": {"select": {"name": issue["project"]["name"] if issue.get("project") else "None"}},
-            "Cycle": {"select": {"name": str(issue["cycle"]["number"])}} if issue.get("cycle") else {"select": {"name": "None"}},
-            "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}  
+            "Status": {"select": {"name": issue.get("state", {}).get("name", "None")}},
+            "Project": {"select": {"name": issue.get("project", {}).get("name", "None")}},
+            "Cycle": {"select": {"name": str(issue.get("cycle", {}).get("number", "None"))}},
+            "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
         
-        # Priority
+        # Priority (map number to string)
         raw_priority = issue.get("priority", 2)  # default Medium
         priority_name = LINEAR_PRIORITY_MAP.get(raw_priority, "Medium") if isinstance(raw_priority, int) else str(raw_priority).capitalize()
         properties["Priority"] = {"select": {"name": priority_name}}
