@@ -187,6 +187,8 @@ def sync_to_notion(issues):
     print(f"[INFO] {len(issues_to_sync)} issues to process")
 
     for issue in issues_to_sync:
+        # DEBUG: inspect title before sending to Notion
+        print(f"[DEBUG] Issue ID {issue['id']} | title raw: {issue.get('title')!r}")
         page = find_notion_page_by_linear_id(issue["id"])
 
         # Build Notion properties
