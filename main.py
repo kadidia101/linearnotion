@@ -46,7 +46,14 @@ def get_linear_issues(team_id):
               name
             }
             cycle { id number name } 
-            labels
+            labels {
+                edges {
+                    node {
+                        id
+                        name
+                    }
+                }
+            }
             project { id name }    
             createdAt
             archivedAt
@@ -134,6 +141,19 @@ def find_notion_page_by_linear_id(database_id, linear_id):
     response.raise_for_status()
     results = response.json().get("results", [])
     return results[0] if results else None
+
+def get_last_sync_time(file_path="last_sync.txt"):
+    try:
+        with open(file_path, "r") as f:
+            ts = f.read().strip()
+            return datetime.fromisoformat(ts)
+    except Exception:
+        return datetime.fromisoformat("2000-01-01T00:00:00")
+
+def save_last_sync_time(timestamp, file_path="last_sync.txt"):
+    with open(file_path, "w") as f:
+        f.write(timestamp.isoformat())
+
 
 def sync_to_notion(issues):
     last_sync = get_last_sync_time()
