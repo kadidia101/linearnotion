@@ -111,33 +111,58 @@ def resolve_linear_assignee_to_notion(issue):
 # ----------------------
 # STEP 2: Sync issues to Notion
 # ----------------------
+def find_notion_page_by_linear_id(linear_id):
+    results = notion.databases.query(
+        database_id=NOTION_DATABASE_ID,
+        filter={
+            "property": "Linear ID",
+            "rich_text": {"equals": linear_id}
+        }
+    )
+    if results["results"]:
+        return results["results"][0]  # return the first match
+    return None
+    
+def split_rich_text(text, chunk_size=2000):
+    """
+    Splits a long string into a list of rich_text blocks for Notion.
+    """
+    return [{"text": {"content": text[i:i+chunk_size]}} for i in range(0, len(text), chunk_size)]
+
+
 def sync_to_notion(issues):
     for issue in issues:
-        # Base properties
         properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
-            "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
+            "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
             "Created At": {"date": {"start": issue["createdAt"]}},
-            "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Testing
-            "Priority": {"select": {"name": issue.get("priority", "Medium")}},  # Adjust default as needed
-            "Project": {"select": {"name": issue.get("project_name", "None")}},  # Replace with actual field
-            "Team": {"select": {"name": issue.get("team_name", "None")}},       # Replace with actual field
+            "Status": {"select": {"name": issue["state"]["name"]}},
+            "Priority": {"select": {"name": issue.get("priority", "Medium")}},
+            "Project": {"select": {"name": issue.get("project", {}).get("name", "None")}},
+            "Team": {"select": {"name": issue.get("team", {}).get("name", "None")}},
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
 
-        # Resolve Linear assignee to Notion people
+        # Resolve Linear assignee to Notion people (single for now)
         people = resolve_linear_assignee_to_notion(issue)
         if people:
             properties["Assignee"] = {"people": people}
 
-        # Create the page in Notion
+        # Check if page already exists in Notion
+        page = find_notion_page_by_linear_id(issue["id"])  # you will implement this
         try:
-            notion.pages.create(
-                parent={"database_id": NOTION_DATABASE_ID},
-                properties=properties
-            )
-            print(f"[INFO] Synced issue '{issue['title']}' to Notion")
+            if page:
+                # Update existing page
+                notion.pages.update(page_id=page["id"], properties=properties)
+                print(f"[INFO] Updated issue '{issue['title']}' in Notion")
+            else:
+                # Create new page
+                notion.pages.create(
+                    parent={"database_id": NOTION_DATABASE_ID},
+                    properties=properties
+                )
+                print(f"[INFO] Created issue '{issue['title']}' in Notion")
         except Exception as e:
             print(f"[ERROR] Failed to sync issue '{issue['title']}': {e}")
 
