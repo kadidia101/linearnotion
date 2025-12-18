@@ -115,9 +115,9 @@ def get_last_linear_sync():
     
     if not last_sync_str:
         # First run — return a very old date to fetch everything
-        return datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+        return datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
     
-    last_sync = datetime.datetime.fromisoformat(last_sync_str[0]["text"]["content"])
+    last_sync = datetime.fromisoformat(last_sync_str[0]["text"]["content"])
     return last_sync
 
 
