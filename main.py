@@ -38,16 +38,11 @@ def to_linear_iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 def get_linear_issues_updated_since(last_sync):
-    """
-    Fetch issues from Linear updated since last_sync.
-    If last_sync is None or very old, fetch all issues.
-    """
     headers = {
         "Authorization": f"Bearer {LINEAR_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    # GraphQL query with variable for incremental fetch
     query = """
     query($updatedAfter: DateTime) {
       issues(updatedAfter: $updatedAfter, first: 100) {
@@ -58,40 +53,28 @@ def get_linear_issues_updated_since(last_sync):
           description
           createdAt
           updatedAt
-          state {
-            name
-          }
-          assignee {
-            name
-            email
-          }
-          labels {
-            nodes {
-              name
-            }
-          }
         }
       }
     }
     """
 
     variables = {}
-    if last_sync:
-        # ensure string in ISO 8601 format
-        variables["updatedAfter"] = last_sync.isoformat()
+    if last_sync is not None:
+        # Convert to ISO 8601 string, round to seconds to be safe
+        iso_ts = last_sync.replace(microsecond=0).isoformat()
+        if iso_ts.endswith("+00:00"):
+            iso_ts = iso_ts.replace("+00:00", "Z")  # Linear expects Z
+        variables["updatedAfter"] = iso_ts
 
-    response = requests.post(
-        LINEAR_ENDPOINT,
-        json={"query": query, "variables": variables},
-        headers=headers
-    )
+    payload = {"query": query}
+    if variables:
+        payload["variables"] = variables
+
+    response = requests.post(LINEAR_URL, json=payload, headers=headers)
     response.raise_for_status()
     data = response.json()
-
-    # Safety check in case Linear returns errors
     if "errors" in data:
         raise Exception(f"Linear API returned errors: {data['errors']}")
-
     return data["data"]["issues"]["nodes"]
 
 # ======================
