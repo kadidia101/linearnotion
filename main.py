@@ -60,17 +60,25 @@ def get_linear_issues(team_id):
         variables = {"teamId": team_id, "after": after}
         response = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
         data = response.json()
+
+        if "errors" in data:
+            print("Linear API returned errors:", data["errors"])
+            break
+
         nodes = data["data"]["team"]["issues"]["nodes"]
         all_issues.extend(nodes)
+
         page_info = data["data"]["team"]["issues"]["pageInfo"]
         if page_info["hasNextPage"]:
             after = page_info["endCursor"]
         else:
             break
 
-    # Filter in-progress/in-training
+    # Filter only "In Progress" or "In Training"
     issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Training"]]
+    print(f"[INFO] Fetched {len(issues)} issues in progress/in training from Linear")
     return issues
+
     
 def get_notion_user_id_by_email(email):
     if not email:
@@ -114,6 +122,11 @@ def sync_to_notion(issues):
             "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
             "Created At": {"date": {"start": issue["createdAt"]}}
+            "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Training
+            "Priority": {"select": {"name": issue.get("priority", "Medium")}},  # Adjust default as needed
+            "Project": {"select": {"name": issue.get("project_name", "None")}},  # Replace with actual field
+            "Team": {"select": {"name": issue.get("team_name", "None")}},       # Replace with actual field
+            "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
 
         # Resolve Linear assignee to Notion people
