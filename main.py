@@ -32,31 +32,27 @@ def linear_query(query, variables=None):
     r.raise_for_status()
     return r.json()["data"]
 
-def get_linear_issues_updated_since(iso_ts):
+def get_linear_issues_updated_since(last_sync):
+    iso_ts = last_sync.astimezone(timezone.utc).isoformat()
+
     query = """
-    query ($updatedAfter: DateTime!) {
+    query Issues($updatedAfter: DateTime!) {
       issues(
-        first: 100
-        filter: { updatedAt: { gte: $updatedAfter } }
+        filter: { updatedAt: { gt: $updatedAfter } }
+        first: 50
       ) {
         nodes {
           id
+          identifier
           title
-          description
-          url
-          priority
-          createdAt
           updatedAt
-          state { name }
-          assignee { name email }
-          team { name }
-          project { name }
+          url
         }
       }
     }
     """
-    data = linear_query(query, {"updatedAfter": iso_ts})
-    return data["issues"]["nodes"]
+
+    return linear_query(query, {"updatedAfter": iso_ts})["issues"]["nodes"]
 
 # ======================
 # NOTION HELPERS
