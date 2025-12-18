@@ -77,7 +77,7 @@ def sync_to_notion(issues):
 # MAIN
 # ----------------------
 if __name__ == "__main__":
-    TEAM_ID = "your_team_id_here"  # <-- PLACE YOUR TEAM ID HERE
+    TEAM_ID = "b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6"  # <-- PLACE YOUR TEAM ID HERE
     issues = get_linear_issues(TEAM_ID)
     print(f"Found {len(issues)} issues in progress/in training.")
     sync_to_notion(issues)
