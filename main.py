@@ -13,6 +13,8 @@ NOTION_DATABASE_ID = os.environ.get("NOTION_DB_LINEAR")
 
 notion = Client(auth=NOTION_TOKEN)
 
+HEADERS = {"Authorization": LINEAR_API_KEY, "Content-Type": "application/json"}
+
 # ----------------------
 # STEP 1: Define GraphQL query to get issues for a team
 # ----------------------
