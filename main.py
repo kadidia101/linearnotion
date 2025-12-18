@@ -94,9 +94,9 @@ def get_linear_issues(team_id):
         else:
             break
 
-    # Filter only "In Progress" or "In Training"
-    issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Training"]]
-    print(f"[INFO] Fetched {len(issues)} issues in progress/in training from Linear")
+    # Filter only "In Progress" or "In Testing"
+    issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Testing"]]
+    print(f"[INFO] Fetched {len(issues)} issues in progress/in testing from Linear")
     return issues
 
     
@@ -193,10 +193,10 @@ def sync_to_notion(issues):
         # Base properties
         properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
-            "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
+            "Description": {"rich_text": split_rich_text(issue.get("description") or "")
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
             "Created At": {"date": {"start": issue["createdAt"]}},
-            "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Training
+            "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Testing
             "Priority": {"select": {"name": issue.get("priority", "Medium")}},  # Adjust default as needed
             "Cycle": {"select": {"name": issue.get("project_name", "None")}},  # Replace with actual field
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
@@ -253,6 +253,6 @@ def sync_to_notion(issues):
 if __name__ == "__main__":
     TEAM_ID = "b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6"  # <-- PLACE YOUR TEAM ID HERE
     issues = get_linear_issues(TEAM_ID)
-    print(f"Found {len(issues)} issues in progress/in training.")
+    print(f"Found {len(issues)} issues in progress/in testing.")
     sync_to_notion(issues)
     print("Sync complete.")
