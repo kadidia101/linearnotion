@@ -32,8 +32,15 @@ def linear_query(query, variables=None):
     r.raise_for_status()
     return r.json()["data"]
 
+def to_linear_iso(dt: datetime) -> str:
+    if isinstance(dt, str):
+        return dt.replace("+00:00", "Z")
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
 def get_linear_issues_updated_since(last_sync: datetime):
-    iso_ts = last_sync.isoformat().replace("+00:00", "Z")
+    iso_ts = to_linear_iso(last_sync)
+
+    print(f"[DEBUG] Querying Linear for issues updated after {iso_ts}")
 
     query = """
     query IssuesUpdatedAfter($updatedAfter: DateTime!) {
@@ -47,6 +54,17 @@ def get_linear_issues_updated_since(last_sync: datetime):
           identifier
           title
           updatedAt
+          url
+          assignee {
+            email
+            name
+          }
+          state {
+            name
+          }
+          project {
+            name
+          }
         }
       }
     }
@@ -54,6 +72,7 @@ def get_linear_issues_updated_since(last_sync: datetime):
 
     data = linear_query(query, {"updatedAfter": iso_ts})
     return data["issues"]["nodes"]
+
 
 
 # ======================
