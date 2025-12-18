@@ -129,9 +129,8 @@ def split_rich_text(text, chunk_size=2000):
     """
     return [{"text": {"content": text[i:i+chunk_size]}} for i in range(0, len(text), chunk_size)]
 
-def find_notion_page_by_linear_id(database_id, linear_id):
-    """Check if a Notion page with this Linear ID already exists using REST API."""
-    url = f"https://api.notion.com/v1/databases/{database_id}/query"
+def find_notion_page_by_linear_id(linear_id):
+    url = f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query"
     payload = {
         "filter": {
             "property": "Linear ID",
@@ -142,6 +141,7 @@ def find_notion_page_by_linear_id(database_id, linear_id):
     response.raise_for_status()
     results = response.json().get("results", [])
     return results[0] if results else None
+
 
 def get_last_sync_time(file_path="last_sync.txt"):
     try:
