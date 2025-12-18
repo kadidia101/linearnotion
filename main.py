@@ -85,27 +85,29 @@ def get_all_linear_issues():
     # GraphQL query: get first 100 issues with selected states
     query = """
     query {
-      issues(first: 100, filter: { state: { name_in: ["In Progress", "In Testing"] } }) {
-        nodes {
-          id
-          identifier
-          title
-          description
-          state {
-            name
-          }
-          createdAt
-          updatedAt
-          assignee {
-            id
-            name
-            email
-          }
-          project {
-            id
-            name
-          }
+        issues(first: 100, filter: { state: { name_in: ["In Progress", "In Testing"] } }) {
+            nodes {
+              id
+              title
+              description
+              state {
+                name
+              }
+              createdAt
+              updatedAt
+              assignee {
+                id
+                name
+                email
+              }
+              project {
+                id
+                name
+              }
+            }
         }
+}
+
       }
     }
     """
