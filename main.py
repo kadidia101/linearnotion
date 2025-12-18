@@ -260,4 +260,5 @@ if __name__ == "__main__":
             print(f"[ERROR] Something went wrong: {e}")
         
         # Wait 60 seconds before next sync
+        print("Sleeping for one minute...")
         time.sleep(60)
