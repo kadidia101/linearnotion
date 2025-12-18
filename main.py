@@ -76,6 +76,37 @@ def get_linear_issues_updated_since(last_sync):
         raise Exception(f"Linear API returned errors: {data['errors']}")
     return data["data"]["issues"]["nodes"]
 
+def get_all_linear_issues():
+    headers = {
+        "Authorization": f"Bearer {LINEAR_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    query = """
+    query {
+      issues(first: 100) {
+        nodes {
+          id
+          identifier
+          title
+          description
+          createdAt
+          updatedAt
+        }
+      }
+    }
+    """
+
+    payload = {"query": query}
+
+    response = requests.post("https://api.linear.app/graphql", json=payload, headers=headers)
+    response.raise_for_status()
+
+    data = response.json()
+    if "errors" in data:
+        raise Exception(f"Linear API returned errors: {data['errors']}")
+    
+    return data["data"]["issues"]["nodes"]
 
 
 # ======================
@@ -230,7 +261,7 @@ def sync_linear():
     
     print(f"[DEBUG] Last sync: {last_sync.isoformat()}")
 
-    issues = get_linear_issues_updated_since(last_sync)
+    issues = get_all_linear_issues(last_sync)
     print(f"[DEBUG] Found {len(issues)} updated issues")
 
     for issue in issues:
