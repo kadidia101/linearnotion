@@ -26,6 +26,7 @@ LINEAR_PRIORITY_MAP = {
     3: "High",
     4: "Urgent"
 }
+
 # ----------------------
 # STEP 1: Define GraphQL query to get issues for a team
 # ----------------------
@@ -93,9 +94,9 @@ def get_linear_issues(team_id):
         else:
             break
 
-    # Filter only "In Progress" or "In Testing"
-    issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Testing"]]
-    print(f"[INFO] Fetched {len(issues)} issues in progress/in testing from Linear")
+    # Filter only "In Progress" or "In Training"
+    issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Training"]]
+    print(f"[INFO] Fetched {len(issues)} issues in progress/in training from Linear")
     return issues
 
     
@@ -116,17 +117,20 @@ def get_notion_user_id_by_email(email):
     
 def resolve_linear_assignee_to_notion(issue):
     """
-    Convert Linear assignees to Notion people property.
+    Convert Linear assignee to Notion people property.
     Returns a list of dicts like [{"id": "NOTION_USER_ID"}].
     """
-    assignees = issue.get("assignees") or [issue.get("assignee")]  # If Linear supports multiple assignees
-    people = []
-    for assignee in assignees:
-        if assignee:
-            notion_user_id = get_notion_user_id_by_email(assignee["name"])
-            if notion_user_id:
-                people.append({"id": notion_user_id})
-    return people
+    assignee = issue.get("assignee")
+    if not assignee:
+        return []  # Unassigned
+
+    # Map Linear assignee to Notion user ID
+    notion_user_id = get_notion_user_id_by_email(assignee["name"])  # or implement name → user ID mapping
+
+    if notion_user_id:
+        return [{"id": notion_user_id}]
+    return []
+
 # ----------------------
 # STEP 2: Sync issues to Notion
 # ----------------------
@@ -149,7 +153,6 @@ def find_notion_page_by_linear_id(linear_id):
     results = response.json().get("results", [])
     return results[0] if results else None
 
-
 def get_last_sync_time(file_path="last_sync.txt"):
     try:
         with open(file_path, "r") as f:
@@ -163,7 +166,7 @@ def get_last_sync_time(file_path="last_sync.txt"):
 def save_last_sync_time(timestamp, file_path="last_sync.txt"):
     with open(file_path, "w") as f:
         f.write(timestamp.isoformat())
-
+        
 def sync_to_notion(issues):
     last_sync = get_last_sync_time()
     # Determine issues to sync with debugging
@@ -186,18 +189,16 @@ def sync_to_notion(issues):
     print(f"[INFO] {len(issues)} issues fetched from Linear")
     print(f"[INFO] {len(issues_to_sync)} issues to process")
 
-    for issue in issues_to_sync:
-        # DEBUG: inspect title before sending to Notion
-        print(f"[DEBUG] Issue ID {issue['id']} | title raw: {issue.get('title')!r}")
-        page = find_notion_page_by_linear_id(issue["id"])
-
-        # Build Notion properties
+    for issue in issues:
+        # Base properties
         properties = {
             "Title": {"title": [{"text": {"content": issue["title"]}}]},
-            "Description": {"rich_text": split_rich_text(issue.get("description") or "")},
+            "Description": {"rich_text": [{"text": {"content": issue.get("description") or ""}}]},
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
             "Created At": {"date": {"start": issue["createdAt"]}},
-            "Status": {"select": {"name": issue["state"]["name"]}},
+            "Status": {"select": {"name": issue["state"]["name"]}},  # In Progress / In Training
+            "Priority": {"select": {"name": issue.get("priority", "Medium")}},  # Adjust default as needed
+            "Cycle": {"select": {"name": issue.get("project_name", "None")}},  # Replace with actual field
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
 
@@ -234,30 +235,24 @@ def sync_to_notion(issues):
             "multi_select": [{"name": e["node"]["name"]} for e in labels_edges]
         } if labels_edges else {"multi_select": []}
 
-        # Create or update page
+
+        # Create the page in Notion
         try:
-            if page:
-                notion.pages.update(page_id=page["id"], properties=properties)
-                print(f"[INFO] Updated issue '{issue['title']}' in Notion")
-            else:
-                notion.pages.create(
-                    parent={"database_id": NOTION_DATABASE_ID},
-                    properties=properties
-                )
-                print(f"[INFO] Created issue '{issue['title']}' in Notion")
+            notion.pages.create(
+                parent={"database_id": NOTION_DATABASE_ID},
+                properties=properties
+            )
+            print(f"[INFO] Synced issue '{issue['title']}' to Notion")
         except Exception as e:
             print(f"[ERROR] Failed to sync issue '{issue['title']}': {e}")
 
-    # Save last sync time
-    save_last_sync_time(datetime.utcnow())
-    print(f"[INFO] Sync complete. {len(issues_to_sync)} issues processed.")
-    
+
 # ----------------------
 # MAIN
 # ----------------------
 if __name__ == "__main__":
     TEAM_ID = "b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6"  # <-- PLACE YOUR TEAM ID HERE
     issues = get_linear_issues(TEAM_ID)
-    print(f"Found {len(issues)} issues in progress/in testing.")
+    print(f"Found {len(issues)} issues in progress/in training.")
     sync_to_notion(issues)
     print("Sync complete.")
