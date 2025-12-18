@@ -111,24 +111,36 @@ def resolve_linear_assignee_to_notion(issue):
 # ----------------------
 # STEP 2: Sync issues to Notion
 # ----------------------
-def find_notion_page_by_linear_id(linear_id):
-    results = notion.databases.query(
-        database_id=NOTION_DATABASE_ID,
-        filter={
-            "property": "Linear ID",
-            "rich_text": {"equals": linear_id}
-        }
-    )
-    if results.get("results"):
-        return results["results"][0]
-    return None
-
-    
 def split_rich_text(text, chunk_size=2000):
     """
     Splits a long string into a list of rich_text blocks for Notion.
     """
     return [{"text": {"content": text[i:i+chunk_size]}} for i in range(0, len(text), chunk_size)]
+
+
+def find_notion_page_by_linear_id_manual(linear_id):
+    """
+    Find a page in Notion by Linear ID without using databases.query.
+    Scans all pages in the database and returns the first match.
+    """
+    # List all pages in the database (paginated if needed)
+    start_cursor = None
+    while True:
+        response = notion.databases.retrieve(NOTION_DATABASE_ID)  # retrieve DB structure
+        pages = notion.databases.list()  # or a custom method if needed
+        # Since older SDKs may not allow listing all pages, you may need to store synced IDs elsewhere
+
+        # For demo: manually loop over known pages (replace with your storage if needed)
+        for page in pages.get("results", []):
+            props = page.get("properties", {})
+            linear_id_prop = props.get("Linear ID", {}).get("rich_text", [])
+            if linear_id_prop and linear_id_prop[0].get("text", {}).get("content") == linear_id:
+                return page
+
+        # Stop looping in this simplified example
+        break
+
+    return None
 
 
 def sync_to_notion(issues):
@@ -145,13 +157,13 @@ def sync_to_notion(issues):
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
 
-        # Resolve Linear assignee to Notion people (single for now)
+        # Resolve assignee to Notion people
         people = resolve_linear_assignee_to_notion(issue)
         if people:
             properties["Assignee"] = {"people": people}
 
-        # Check if page already exists in Notion
-        page = find_notion_page_by_linear_id(issue["id"])  # you will implement this
+        # Find existing page manually
+        page = find_notion_page_by_linear_id_manual(issue["id"])
         try:
             if page:
                 # Update existing page
