@@ -19,6 +19,13 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
+LINEAR_PRIORITY_MAP = {
+    0: "No priority",
+    1: "Low",
+    2: "Medium",
+    3: "High",
+    4: "Urgent"
+}
 # ----------------------
 # STEP 1: Define GraphQL query to get issues for a team
 # ----------------------
@@ -45,7 +52,7 @@ def get_linear_issues(team_id):
             state {
               name
             }
-            cycle { id number name } 
+            cycle { number } 
             labels {
                 edges {
                     node {
@@ -164,7 +171,7 @@ def sync_to_notion(issues):
     # Only sync issues updated since last sync
     issues_to_sync = [
         issue for issue in issues
-        if datetime.fromisoformat(issue["updatedAt"].replace("Z", "+00:00")) > last_sync
+        if datetime.fromisoformat(issue.get("updatedAt", issue.get("createdAt")).replace("Z", "+00:00")) > last_sync
     ]
 
     for issue in issues_to_sync:
@@ -177,9 +184,16 @@ def sync_to_notion(issues):
             "Linear ID": {"rich_text": [{"text": {"content": issue["id"]}}]},
             "Created At": {"date": {"start": issue["createdAt"]}},
             "Status": {"select": {"name": issue["state"]["name"]}},
-            "Priority": {"select": {"name": issue.get("priority", "Medium")}},
             "Linear URL": {"url": f"https://linear.app/issue/{issue['id']}"}
         }
+
+        # Priority (string)
+        raw_priority = issue.get("priority", "medium")
+        if isinstance(raw_priority, int):
+            priority_name = LINEAR_PRIORITY_MAP.get(raw_priority, "Medium")
+        else:
+            priority_name = str(raw_priority).capitalize()
+        properties["Priority"] = {"select": {"name": priority_name}}
 
         # Project (select)
         project = issue.get("project")
@@ -188,7 +202,7 @@ def sync_to_notion(issues):
         else:
             properties["Project"] = None
 
-        # Cycle (single select)
+        # Cycle (single select, convert number to string)
         cycle = issue.get("cycle")
         if cycle:
             properties["Cycle"] = {"select": {"name": str(cycle["number"])}}
@@ -209,11 +223,9 @@ def sync_to_notion(issues):
         # Create or update page
         try:
             if page:
-                # Update existing page
                 notion.pages.update(page_id=page["id"], properties=properties)
                 print(f"[INFO] Updated issue '{issue['title']}' in Notion")
             else:
-                # Create new page
                 notion.pages.create(
                     parent={"database_id": NOTION_DATABASE_ID},
                     properties=properties
@@ -225,7 +237,6 @@ def sync_to_notion(issues):
     # Save last sync time
     save_last_sync_time(datetime.utcnow())
     print(f"[INFO] Sync complete. {len(issues_to_sync)} issues processed.")
-
 # ----------------------
 # MAIN
 # ----------------------
