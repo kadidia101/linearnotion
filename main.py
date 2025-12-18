@@ -65,7 +65,22 @@ def get_linear_issues(team_id):
     # Filter in-progress/in-training
     issues = [i for i in all_issues if i["state"]["name"] in ["In Progress", "In Training"]]
     return issues
+    
+def get_notion_user_id_by_email(email):
+    if not email:
+        return None
 
+    url = "https://api.notion.com/v1/users"
+    response = requests.get(url, headers=HEADERS)
+    response.raise_for_status()
+
+    for user in response.json().get("results", []):
+        person = user.get("person")
+        if person and person.get("email") == email:
+            return user["id"]
+
+    return None
+    
 def resolve_linear_assignee_to_notion(issue):
     """
     Convert Linear assignee to Notion people property.
