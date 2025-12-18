@@ -59,11 +59,10 @@ def get_linear_issues_updated_since(last_sync):
     """
 
     variables = {}
-    if last_sync is not None:
-        # Convert to ISO 8601 string, round to seconds to be safe
+    if last_sync is not None and last_sync.year > 2000:
         iso_ts = last_sync.replace(microsecond=0).isoformat()
         if iso_ts.endswith("+00:00"):
-            iso_ts = iso_ts.replace("+00:00", "Z")  # Linear expects Z
+            iso_ts = iso_ts.replace("+00:00", "Z")
         variables["updatedAfter"] = iso_ts
 
     payload = {"query": query}
@@ -76,6 +75,7 @@ def get_linear_issues_updated_since(last_sync):
     if "errors" in data:
         raise Exception(f"Linear API returned errors: {data['errors']}")
     return data["data"]["issues"]["nodes"]
+
 
 # ======================
 # NOTION HELPERS
