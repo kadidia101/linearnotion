@@ -45,7 +45,7 @@ def get_linear_issues(team_id):
     }
     """
     
-    variables = {"teamId": b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6} 
+    variables = {"teamId": "b9b18fd9-3e94-4e0c-b2b2-a7a1eb2560d6"} 
     
     response = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
     response.raise_for_status()
