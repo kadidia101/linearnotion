@@ -43,32 +43,33 @@ def get_linear_issues_updated_since(last_sync: datetime):
     print(f"[DEBUG] Querying Linear for issues updated after {iso_ts}")
 
     query = """
-    query IssuesUpdatedAfter($updatedAfter: DateTime!) {
-      issues(
-        filter: {
-          updatedAt: { gt: $updatedAfter }
-        }
-      ) {
-        nodes {
-          id
-          identifier
-          title
-          updatedAt
-          url
-          assignee {
-            email
-            name
-          }
-          state {
-            name
-          }
-          project {
-            name
-          }
-        }
+query IssuesUpdatedAfter($updatedAfter: DateTime!) {
+  issues(
+    first: 50
+    filter: {
+      updatedAt: { gt: $updatedAfter }
+    }
+  ) {
+    nodes {
+      id
+      identifier
+      title
+      updatedAt
+      url
+      assignee {
+        email
+        name
+      }
+      state {
+        name
+      }
+      project {
+        name
       }
     }
-    """
+  }
+}
+"""
 
     data = linear_query(query, {"updatedAfter": iso_ts})
     return data["issues"]["nodes"]
